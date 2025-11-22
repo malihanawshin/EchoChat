@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.route.js';
 import path from 'path';
+import { connect_DB } from './lib/db.js';
 
 dotenv.config();
 
@@ -10,6 +11,8 @@ const __dirname = path.resolve();
 const port = process.env.PORT || 3000;
 
 console.log(`PORT: ${process.env.PORT}`);
+
+app.use(express.json());
 
 app.use("/api/auth",authRoutes);
 
@@ -22,5 +25,6 @@ if (process.env.NODE_ENV === 'production') {
     });
 }
 
-
-app.listen(port, () =>  console.log(`Server is running on http://localhost:${port}`));
+app.listen(port, () =>  {console.log(`Server is running on http://localhost:${port}`);
+    connect_DB(process.env.MONGO_URL);
+});
