@@ -3,6 +3,7 @@ import { ENV } from './lib/env.js';
 import authRoutes from './routes/auth.route.js';
 import path from 'path';
 import { connect_DB } from './lib/db.js';
+import cookieParser from 'cookie-parser';
 
 const app = express();
 const __dirname = path.resolve();
@@ -11,7 +12,7 @@ const port = ENV.PORT || 3000;
 console.log(`PORT: ${ENV.PORT}`);
 
 app.use(express.json());
-
+app.use(cookieParser());
 app.use("/api/auth",authRoutes);
 
 //ready for production
