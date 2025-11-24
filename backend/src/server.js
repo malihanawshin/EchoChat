@@ -1,6 +1,7 @@
 import express from 'express';
 import { ENV } from './lib/env.js';
 import authRoutes from './routes/auth.route.js';
+import messageRoutes from './routes/message.route.js';
 import path from 'path';
 import { connect_DB } from './lib/db.js';
 import cookieParser from 'cookie-parser';
@@ -14,6 +15,8 @@ console.log(`PORT: ${ENV.PORT}`);
 app.use(express.json());
 app.use(cookieParser());
 app.use("/api/auth",authRoutes);
+app.use("/api/messages", messageRoutes);
+
 
 //ready for production
 if (ENV.NODE_ENV === 'production') {
