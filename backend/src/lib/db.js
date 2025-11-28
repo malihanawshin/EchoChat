@@ -1,11 +1,15 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
+import { ENV } from "./env.js";
 
-export const connect_DB = async (mongoURL) => {
-    try {
-        const con = await mongoose.connect(mongoURL)
-        console.log('Connected to MongoDB', con.connection.host);        
-        } catch (error) {
-        console.error('Error connecting to MongoDB:', error);
-        process.exit(1); // 1 indicates failure, 0 indicates success
-        }
-    }
+export const connect_DB = async () => {
+  try {
+    const { MONGO_URL } = ENV;
+    if (!MONGO_URL) throw new Error("MONGO_URL is not set");
+
+    const conn = await mongoose.connect(ENV.MONGO_URL);
+    console.log("MONGODB CONNECTED:", conn.connection.host);
+  } catch (error) {
+    console.error("Error connection to MONGODB:", error);
+    process.exit(1); // 1 status code means fail, 0 means success
+  }
+};
