@@ -6,10 +6,10 @@ import path from 'path';
 import { connect_DB } from './lib/db.js';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import { app, server } from "./lib/socket.js";
 
-const app = express();
 const __dirname = path.resolve();
-const port = ENV.PORT || 3000;
+const PORT = ENV.PORT || 3000;
 
 console.log(`PORT: ${ENV.PORT}`);
 
@@ -33,6 +33,7 @@ if (ENV.NODE_ENV === 'production') {
     });
 }
 
-app.listen(port, () =>  {console.log(`Server is running on http://localhost:${port}`);
-    connect_DB(ENV.MONGO_URL);
+server.listen(PORT, () => {
+  console.log("Server running on port: " + PORT);
+  connect_DB();
 });
