@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
-import { toast } from "react-hot-toast";
+import toast from "react-hot-toast";
 
-export const useAuthStore = create((set) => ({
+export const useAuthStore = create((set, get) => ({
   authUser: null,
   isCheckingAuth: true,
   isSigningUp: false,
@@ -10,23 +10,27 @@ export const useAuthStore = create((set) => ({
 
   checkAuth: async () => {
     try {
-      const response = await axiosInstance.get("/auth/check");
-      set({ authUser: response.data.user });
+      const res = await axiosInstance.get("/auth/check");
+      set({ authUser: res.data.user });
+      //get().connectSocket();
     } catch (error) {
-      console.log("Error checking auth:", error);
+      console.log("Error in authCheck:", error);
       set({ authUser: null });
     } finally {
       set({ isCheckingAuth: false });
     }
-  },      
+  },
 
   signup: async (data) => {
+    set({ isSigningUp: true });
     try {
-      const response = await axiosInstance.post("/auth/signup", data);
-      set({ authUser: response.data });
-      toast.success("Signup successful!");
+      const res = await axiosInstance.post("/auth/signup", data);
+      set({ authUser: res.data });
+
+      toast.success("Account created successfully!");
+      //get().connectSocket();
     } catch (error) {
-      toast.error("Signup failed. Please try again.");
+      toast.error(error.response.data.message);
     } finally {
       set({ isSigningUp: false });
     }
@@ -35,10 +39,14 @@ export const useAuthStore = create((set) => ({
   login: async (data) => {
     set({ isLoggingIn: true });
     try {
-      const response = await axiosInstance.post("/auth/login", data);
-      set({ authUser: response.data });
-      toast.success("Login successful!");
+      const res = await axiosInstance.post("/auth/login", data);
+      set({ authUser: res.data });
+
+      toast.success("Logged in successfully");
+
+      //get().connectSocket();
     } catch (error) {
+      //toast.error(error.response.data.message);
       toast.error("Login failed. Please check your credentials.");
     } finally {
       set({ isLoggingIn: false });
@@ -49,9 +57,11 @@ export const useAuthStore = create((set) => ({
     try {
       await axiosInstance.post("/auth/logout");
       set({ authUser: null });
-      toast.success("Logged out successfully!");
+      toast.success("Logged out successfully");
+      //get().disconnectSocket();
     } catch (error) {
-      toast.error("Logout failed. Please try again.");
+      toast.error("Error logging out");
+      console.log("Logout error:", error);
     }
   },
 
@@ -66,5 +76,5 @@ export const useAuthStore = create((set) => ({
     }
   },
 
-  
-}));    
+ 
+}));
