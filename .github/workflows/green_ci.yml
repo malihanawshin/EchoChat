@@ -82,7 +82,7 @@ jobs:
               "branch": "${{ github.ref_name }}",
               "commit": "${{ github.sha }}",
               "duration": ${{ steps.duration.outputs.duration }},
-              "runner_type": "${{ runner.os }}"
+              "runner_type": "${{ runner.os }}",
               "metric_type": "ci_build"
             }'
 
