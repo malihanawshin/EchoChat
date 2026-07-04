@@ -1,0 +1,86 @@
+name: Green CI Metrics
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  green-metrics:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Record build start time
+        id: start
+        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Build backend
+        working-directory: backend
+        run: |
+          if npm run | grep -q " build"; then
+            npm run build
+          else
+            npm run --if-present lint
+          fi
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          if npm run | grep -q " build"; then
+            npm run build
+          else
+            npm run --if-present lint
+          fi
+
+      - name: Record build end time
+        id: end
+        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate build duration
+        id: duration
+        run: |
+          start=${{ steps.start.outputs.time }}
+          end=${{ steps.end.outputs.time }}
+          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
+
+      - name: Send data to Green Dev Backend
+        env:
+          GREEN_METRICS_URL: ${{ secrets.GREEN_METRICS_URL }}
+          GREEN_METRICS_TOKEN: ${{ secrets.GREEN_METRICS_TOKEN }}
+        run: |
+          curl --fail --show-error --silent -X POST "$GREEN_METRICS_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GREEN_METRICS_TOKEN" \
+            -d '{
+              "repo": "${{ github.repository }}",
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}",
+              "duration": ${{ steps.duration.outputs.duration }},
+              "runner_type": "${{ runner.os }}"
+            }'
