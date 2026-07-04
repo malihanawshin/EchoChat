@@ -84,3 +84,24 @@ jobs:
               "duration": ${{ steps.duration.outputs.duration }},
               "runner_type": "${{ runner.os }}"
             }'
+
+      - name: Runtime smoke test
+        run: |
+          cd backend
+          npm run dev &
+          BACKEND_PID=$!
+          cd ../frontend
+          npm run dev -- --host 127.0.0.1 --port 5173 &
+          FRONTEND_PID=$!
+
+          for i in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:5173 > /dev/null; then
+              echo "Frontend is responding"
+              kill $FRONTEND_PID $BACKEND_PID
+              exit 0
+            fi
+            sleep 1
+          done
+
+          kill $FRONTEND_PID $BACKEND_PID
+          exit 1
