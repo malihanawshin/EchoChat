@@ -8,6 +8,7 @@ on:
 jobs:
   green-metrics:
     runs-on: ubuntu-latest
+
     env:
       GREEN_METRICS_URL: ${{ secrets.GREEN_METRICS_URL }}
       GREEN_METRICS_TOKEN: ${{ secrets.GREEN_METRICS_TOKEN }}
@@ -21,116 +22,160 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install backend dependencies
+      - name: Install backend dependencies and send metric
         working-directory: backend
         run: |
+          start=$(date +%s)
+
           if [ -f package-lock.json ]; then
             npm ci
           else
             npm install
           fi
 
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+          end=$(date +%s)
+          duration=$((end - start))
 
-      - name: Record build start time
-        id: start
-        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
-
-      - name: Build backend
-        working-directory: backend
-        run: |
-          if npm run | grep -q " build"; then
-            npm run build
-          else
-            npm run --if-present lint
-          fi
-
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          if npm run | grep -q " build"; then
-            npm run build
-          else
-            npm run --if-present lint
-          fi
-
-      - name: Record build end time
-        id: end
-        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
-
-      - name: Calculate build duration
-        id: duration
-        run: |
-          start=${{ steps.start.outputs.time }}
-          end=${{ steps.end.outputs.time }}
-          echo "duration=$((end - start))" >> "$GITHUB_OUTPUT"
-
-      - name: Send build metric Green Dev Backend
-        run: |
           curl --fail --show-error --silent -X POST "$GREEN_METRICS_URL" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $GREEN_METRICS_TOKEN" \
-            -d '{
-              "repo": "${{ github.repository }}",
-              "branch": "${{ github.ref_name }}",
-              "commit": "${{ github.sha }}",
-              "duration": ${{ steps.duration.outputs.duration }},
-              "runner_type": "${{ runner.os }}",
-              "metric_type": "ci_build"
-            }'
+            -d "{
+              \"repo\": \"${{ github.repository }}\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"commit\": \"${{ github.sha }}\",
+              \"duration\": $duration,
+              \"runner_type\": \"${{ runner.os }}\",
+              \"metric_type\": \"ci_step\",
+              \"step_name\": \"backend_dependency_install\",
+              \"phase\": \"dependencies\"
+            }"
 
-      # 2. Runtime smoke metric
-      - name: Record runtime smoke start
-        id: runtime_start
-        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
-
-      - name: Runtime smoke test
+      - name: Install frontend dependencies and send metric
+        working-directory: frontend
         run: |
+          start=$(date +%s)
+
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+          end=$(date +%s)
+          duration=$((end - start))
+
+          curl --fail --show-error --silent -X POST "$GREEN_METRICS_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GREEN_METRICS_TOKEN" \
+            -d "{
+              \"repo\": \"${{ github.repository }}\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"commit\": \"${{ github.sha }}\",
+              \"duration\": $duration,
+              \"runner_type\": \"${{ runner.os }}\",
+              \"metric_type\": \"ci_step\",
+              \"step_name\": \"frontend_dependency_install\",
+              \"phase\": \"dependencies\"
+            }"
+
+      - name: Build backend and send metric
+        working-directory: backend
+        run: |
+          start=$(date +%s)
+
+          if npm run | grep -q " build"; then
+            npm run build
+          else
+            npm run --if-present lint
+          fi
+
+          end=$(date +%s)
+          duration=$((end - start))
+
+          curl --fail --show-error --silent -X POST "$GREEN_METRICS_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GREEN_METRICS_TOKEN" \
+            -d "{
+              \"repo\": \"${{ github.repository }}\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"commit\": \"${{ github.sha }}\",
+              \"duration\": $duration,
+              \"runner_type\": \"${{ runner.os }}\",
+              \"metric_type\": \"ci_step\",
+              \"step_name\": \"backend_build\",
+              \"phase\": \"build\"
+            }"
+
+      - name: Build frontend and send metric
+        working-directory: frontend
+        run: |
+          start=$(date +%s)
+
+          if npm run | grep -q " build"; then
+            npm run build
+          else
+            npm run --if-present lint
+          fi
+
+          end=$(date +%s)
+          duration=$((end - start))
+
+          curl --fail --show-error --silent -X POST "$GREEN_METRICS_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GREEN_METRICS_TOKEN" \
+            -d "{
+              \"repo\": \"${{ github.repository }}\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"commit\": \"${{ github.sha }}\",
+              \"duration\": $duration,
+              \"runner_type\": \"${{ runner.os }}\",
+              \"metric_type\": \"ci_step\",
+              \"step_name\": \"frontend_build\",
+              \"phase\": \"build\"
+            }"
+
+      - name: Runtime smoke test and send metric
+        run: |
+          start=$(date +%s)
+
           cd backend
           npm run dev &
           BACKEND_PID=$!
+
           cd ../frontend
           npm run dev -- --host 127.0.0.1 --port 5173 &
           FRONTEND_PID=$!
 
+          success=0
+
           for i in {1..30}; do
             if curl --silent --fail http://127.0.0.1:5173 > /dev/null; then
               echo "Frontend is responding"
-              kill $FRONTEND_PID $BACKEND_PID
-              exit 0
+              success=1
+              break
             fi
             sleep 1
           done
 
-          kill $FRONTEND_PID $BACKEND_PID
-          exit 1
+          kill $FRONTEND_PID $BACKEND_PID || true
 
-      - name: Record runtime smoke end
-        id: runtime_end
-        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
+          end=$(date +%s)
+          duration=$((end - start))
 
-      - name: Calculate runtime duration
-        id: runtime_duration
-        run: |
-          echo "duration=$((${{ steps.runtime_end.outputs.time }} - ${{ steps.runtime_start.outputs.time }}))" >> "$GITHUB_OUTPUT"
-
-      - name: Send runtime smoke metric
-        run: |
           curl --fail --show-error --silent -X POST "$GREEN_METRICS_URL" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $GREEN_METRICS_TOKEN" \
-            -d '{
-              "repo": "${{ github.repository }}",
-              "branch": "${{ github.ref_name }}",
-              "commit": "${{ github.sha }}",
-              "duration": ${{ steps.runtime_duration.outputs.duration }},
-              "runner_type": "${{ runner.os }}",
-              "metric_type": "runtime_smoke_test"
-            }'
+            -d "{
+              \"repo\": \"${{ github.repository }}\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"commit\": \"${{ github.sha }}\",
+              \"duration\": $duration,
+              \"runner_type\": \"${{ runner.os }}\",
+              \"metric_type\": \"ci_step\",
+              \"step_name\": \"runtime_smoke_test\",
+              \"phase\": \"runtime\"
+            }"
+
+          if [ "$success" -ne 1 ]; then
+            exit 1
+          fi
